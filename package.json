@@ -1,5 +1,5 @@
 {
-  "name": "senior-design",
+  "name": "concert-companion",
   "version": "1.0.0",
   "description": "Concert discovery app with travel recommendations",
   "main": "server/index.js",
