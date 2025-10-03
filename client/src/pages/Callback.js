@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const Callback = () => {
@@ -6,9 +6,22 @@ const Callback = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState('Processing authentication...');
   const [error, setError] = useState(null);
+  const hasAttemptedExchange = useRef(false);
 
   useEffect(() => {
     const exchangeCodeForToken = async () => {
+      if (hasAttemptedExchange.current) return; // Prevent multiple requests
+      hasAttemptedExchange.current = true;
+      
+      // Check if we already have a token
+      const existingToken = localStorage.getItem('spotify_access_token');
+      if (existingToken) {
+        console.log('Token already exists, redirecting...');
+        setStatus('Already authenticated! Redirecting...');
+        setTimeout(() => navigate('/'), 1000);
+        return;
+      }
+      
       try {
         // Debug: Log the full URL and search params
         console.log('Full URL:', window.location.href);

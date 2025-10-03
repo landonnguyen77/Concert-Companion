@@ -18,9 +18,7 @@ app.use(morgan('dev'));
 app.use(cors({
   origin: [
     process.env.CLIENT_URL || 'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001'
+    'http://127.0.0.1:3000'
   ],
   credentials: true
 }));
@@ -150,30 +148,23 @@ app.post('/api/spotify/token', async (req, res) => {
   try {
     const { code } = req.body;
     
-    console.log('🎵 Exchanging Spotify authorization code for access token...');
-    console.log('Received code:', code ? 'Present' : 'Missing');
-    
     if (!code) {
-      console.log('❌ No authorization code provided');
       return res.status(400).json({
         error: 'Missing authorization code'
       });
     }
+
+    console.log('🎵 Exchanging Spotify authorization code for access token...');
 
     // Spotify token endpoint
     const tokenUrl = 'https://accounts.spotify.com/api/token';
     
     // Your Spotify app credentials
     const CLIENT_ID = 'd88d11f594d146b6a607b0b02f6cf2a3';
-    const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+    const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET; // You'll need to add this to your .env
     const REDIRECT_URI = 'http://127.0.0.1:3000/callback';
 
-    console.log('CLIENT_ID:', CLIENT_ID);
-    console.log('CLIENT_SECRET:', CLIENT_SECRET ? 'Present' : 'Missing');
-    console.log('REDIRECT_URI:', REDIRECT_URI);
-
     if (!CLIENT_SECRET) {
-      console.log('❌ Spotify Client Secret not configured');
       return res.status(500).json({
         error: 'Spotify Client Secret not configured'
       });
@@ -207,12 +198,10 @@ app.post('/api/spotify/token', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Spotify token exchange failed:', error.response?.data || error.message);
-    console.error('Full error details:', error);
     
     res.status(500).json({
       error: 'Failed to exchange authorization code',
-      message: error.response?.data?.error_description || error.message,
-      details: error.response?.data || 'No additional details'
+      message: error.response?.data?.error_description || error.message
     });
   }
 });
