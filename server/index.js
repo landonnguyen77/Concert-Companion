@@ -1,10 +1,11 @@
-require('dotenv').config();
+require('dotenv').config({ path: './server/.env' });
 console.log('Starting Concert Companion Server...');
 
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const axios = require('axios');
 
 const { pool, query } = require('./config/database');
 
@@ -15,7 +16,12 @@ const PORT = process.env.PORT || 5001;
 app.use(helmet()); 
 app.use(morgan('dev')); 
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: [
+    process.env.CLIENT_URL || 'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001'
+  ],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -139,6 +145,78 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
+// Spotify token exchange endpoint
+app.post('/api/spotify/token', async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    console.log('🎵 Exchanging Spotify authorization code for access token...');
+    console.log('Received code:', code ? 'Present' : 'Missing');
+    
+    if (!code) {
+      console.log('❌ No authorization code provided');
+      return res.status(400).json({
+        error: 'Missing authorization code'
+      });
+    }
+
+    // Spotify token endpoint
+    const tokenUrl = 'https://accounts.spotify.com/api/token';
+    
+    // Your Spotify app credentials
+    const CLIENT_ID = 'd88d11f594d146b6a607b0b02f6cf2a3';
+    const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+    const REDIRECT_URI = 'http://127.0.0.1:3000/callback';
+
+    console.log('CLIENT_ID:', CLIENT_ID);
+    console.log('CLIENT_SECRET:', CLIENT_SECRET ? 'Present' : 'Missing');
+    console.log('REDIRECT_URI:', REDIRECT_URI);
+
+    if (!CLIENT_SECRET) {
+      console.log('❌ Spotify Client Secret not configured');
+      return res.status(500).json({
+        error: 'Spotify Client Secret not configured'
+      });
+    }
+
+    // Prepare the request data
+    const data = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: REDIRECT_URI,
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET
+    });
+
+    // Exchange code for access token
+    const response = await axios.post(tokenUrl, data, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+
+    console.log('✅ Successfully obtained Spotify access token');
+
+    // Return the tokens to the frontend
+    res.json({
+      access_token: response.data.access_token,
+      refresh_token: response.data.refresh_token,
+      expires_in: response.data.expires_in,
+      token_type: response.data.token_type
+    });
+
+  } catch (error) {
+    console.error('❌ Spotify token exchange failed:', error.response?.data || error.message);
+    console.error('Full error details:', error);
+    
+    res.status(500).json({
+      error: 'Failed to exchange authorization code',
+      message: error.response?.data?.error_description || error.message,
+      details: error.response?.data || 'No additional details'
+    });
+  }
+});
+
 
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.stack);
@@ -161,7 +239,8 @@ app.use('*', (req, res) => {
       'GET /api/health',
       'GET /api/test-db',
       'GET /api/users',
-      'POST /api/users'
+      'POST /api/users',
+      'POST /api/spotify/token'
     ]
   });
 });
@@ -179,6 +258,7 @@ app.listen(PORT, () => {
   console.log('  GET  /api/test-db   - Database test');
   console.log('  GET  /api/users     - List all users');
   console.log('  POST /api/users     - Create new user');
+  console.log('  POST /api/spotify/token - Exchange Spotify code for token');
   console.log('');
   console.log('🔍 Test with: curl http://localhost:' + PORT + '/api/test-db');
 });
