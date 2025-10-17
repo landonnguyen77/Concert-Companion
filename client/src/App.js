@@ -1,6 +1,7 @@
 import React from 'react';
 import HomePage from './pages/HomePage';
 import Callback from './pages/Callback';
+import Dashboard from './pages/Dashboard';
 import './App.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
@@ -11,6 +12,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/callback" element={<Callback />} />
+          <Route path="/dashboard" element={<Dashboard />} />
         </Routes>
       </div>
     </Router>

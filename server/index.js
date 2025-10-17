@@ -1,6 +1,7 @@
 require('dotenv').config({ path: './server/.env' });
 console.log('Starting Concert Companion Server...');
 
+const spotifyService = require('./services/spotifyService');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -53,7 +54,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/test-db', async (req, res) => {
   try {
-    console.log('🔍 Testing database connection...');
+    console.log('Testing database connection...');
     
 
     const result = await query('SELECT NOW() as current_time, version() as pg_version');
@@ -114,7 +115,7 @@ app.post('/api/users', async (req, res) => {
       });
     }
     
-    console.log(`👤 Creating new user: ${name} (${email})`);
+    console.log(`Creating new user: ${name} (${email})`);
     
     const result = await query(
       'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email, created_at',
@@ -143,7 +144,6 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-// Spotify token exchange endpoint
 app.post('/api/spotify/token', async (req, res) => {
   try {
     const { code } = req.body;
@@ -154,14 +154,11 @@ app.post('/api/spotify/token', async (req, res) => {
       });
     }
 
-    console.log('🎵 Exchanging Spotify authorization code for access token...');
+    console.log('Exchanging Spotify authorization code...');
 
-    // Spotify token endpoint
     const tokenUrl = 'https://accounts.spotify.com/api/token';
-    
-    // Your Spotify app credentials
     const CLIENT_ID = 'd88d11f594d146b6a607b0b02f6cf2a3';
-    const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET; // You'll need to add this to your .env
+    const CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
     const REDIRECT_URI = 'http://127.0.0.1:3000/callback';
 
     if (!CLIENT_SECRET) {
@@ -170,7 +167,6 @@ app.post('/api/spotify/token', async (req, res) => {
       });
     }
 
-    // Prepare the request data
     const data = new URLSearchParams({
       grant_type: 'authorization_code',
       code: code,
@@ -179,33 +175,132 @@ app.post('/api/spotify/token', async (req, res) => {
       client_secret: CLIENT_SECRET
     });
 
-    // Exchange code for access token
-    const response = await axios.post(tokenUrl, data, {
+    // Exchange code for tokens
+    const tokenResponse = await axios.post(tokenUrl, data, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }
     });
 
-    console.log('✅ Successfully obtained Spotify access token');
+    const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
-    // Return the tokens to the frontend
+    console.log('Got access token, now fetching user data...');
+
+    // Use the Spotify service to complete authentication
+    const { user, topArtists } = await spotifyService.completeSpotifyAuth(
+      access_token,
+      refresh_token,
+      expires_in
+    );
+
+    console.log('User authenticated and data saved!');
+
+    // Return tokens and user info
     res.json({
-      access_token: response.data.access_token,
-      refresh_token: response.data.refresh_token,
-      expires_in: response.data.expires_in,
-      token_type: response.data.token_type
+      access_token,
+      refresh_token,
+      expires_in,
+      user: {
+        id: user.id,
+        spotify_id: user.spotify_id,
+        display_name: user.display_name,
+        email: user.email,
+        profile_image_url: user.profile_image_url
+      },
+      top_artists_count: topArtists.length
     });
 
   } catch (error) {
-    console.error('❌ Spotify token exchange failed:', error.response?.data || error.message);
+    console.error('Spotify token exchange failed:', error.response?.data || error.message);
     
     res.status(500).json({
-      error: 'Failed to exchange authorization code',
-      message: error.response?.data?.error_description || error.message
+      error: 'Failed to complete Spotify authentication',
+      message: error.message
     });
   }
 });
 
+app.get('/api/user/profile/:spotifyId', async (req, res) => {
+  try {
+    const { spotifyId } = req.params;
+    
+    // Get user from database
+    const user = await spotifyService.getUserBySpotifyId(spotifyId);
+    
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found'
+      });
+    }
+    
+    // Get user's top artists
+    const artists = await spotifyService.getUserArtistsFromDB(user.id);
+    
+    res.json({
+      user: {
+        id: user.id,
+        spotify_id: user.spotify_id,
+        display_name: user.display_name,
+        email: user.email,
+        profile_image_url: user.profile_image_url,
+        country: user.country
+      },
+      top_artists: artists
+    });
+    
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({
+      error: 'Failed to fetch user profile',
+      message: error.message
+    });
+  }
+});
+
+app.post('/api/user/refresh-artists', async (req, res) => {
+  try {
+    const { spotifyId } = req.body;
+    
+    if (!spotifyId) {
+      return res.status(400).json({
+        error: 'Missing spotify_id'
+      });
+    }
+    
+    // Get user from database
+    const user = await spotifyService.getUserBySpotifyId(spotifyId);
+    
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found'
+      });
+    }
+    
+    // Check if token is still valid
+    if (new Date(user.token_expires_at) < new Date()) {
+      return res.status(401).json({
+        error: 'Token expired',
+        message: 'Please log in again'
+      });
+    }
+    
+    // Fetch fresh data from Spotify
+    const topArtists = await spotifyService.getUserTopArtists(user.spotify_access_token);
+    await spotifyService.saveUserArtists(user.id, topArtists);
+    
+    res.json({
+      message: 'Top artists refreshed successfully',
+      artists_count: topArtists.length
+    });
+    
+  } catch (error) {
+    console.error('Error refreshing artists:', error);
+    res.status(500).json({
+      error: 'Failed to refresh artists',
+      message: error.message
+    });
+  }
+});
 
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.stack);
@@ -248,6 +343,8 @@ app.listen(PORT, () => {
   console.log('  GET  /api/users     - List all users');
   console.log('  POST /api/users     - Create new user');
   console.log('  POST /api/spotify/token - Exchange Spotify code for token');
+  console.log('  GET /api/user/profile/:spotifyId - Get user profile and artist');
+  console.log('  POST /api/user/refresh-artists  - refresh user\'s top artists');
   console.log('');
   console.log('🔍 Test with: curl http://localhost:' + PORT + '/api/test-db');
 });

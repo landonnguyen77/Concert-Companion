@@ -1,3 +1,4 @@
+// client/src/pages/Callback.js - REPLACE YOUR EXISTING FILE
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -10,7 +11,7 @@ const Callback = () => {
 
   useEffect(() => {
     const exchangeCodeForToken = async () => {
-      if (hasAttemptedExchange.current) return; // Prevent multiple requests
+      if (hasAttemptedExchange.current) return;
       hasAttemptedExchange.current = true;
       
       // Check if we already have a token
@@ -18,25 +19,17 @@ const Callback = () => {
       if (existingToken) {
         console.log('Token already exists, redirecting...');
         setStatus('Already authenticated! Redirecting...');
-        setTimeout(() => navigate('/'), 1000);
+        setTimeout(() => navigate('/dashboard'), 1000);
         return;
       }
       
       try {
-        // Debug: Log the full URL and search params
-        console.log('Full URL:', window.location.href);
-        console.log('Search params:', location.search);
-        
-        // Parse the authorization code from the URL
         const params = new URLSearchParams(location.search);
         const code = params.get('code');
-        const error = params.get('error');
+        const errorParam = params.get('error');
         
-        console.log('Authorization code:', code);
-        console.log('Error parameter:', error);
-        
-        if (error) {
-          setError(`Spotify authorization error: ${error}`);
+        if (errorParam) {
+          setError(`Spotify authorization error: ${errorParam}`);
           return;
         }
         
@@ -45,11 +38,10 @@ const Callback = () => {
           return;
         }
 
-        console.log('Authorization code:', code);
+        console.log('Authorization code received:', code);
         setStatus('Exchanging code for access token...');
 
-        // Send code to backend to exchange for access token
-        console.log('Sending request to backend...');
+        // Send code to backend
         const response = await fetch('http://localhost:5001/api/spotify/token', {
           method: 'POST',
           headers: {
@@ -57,8 +49,6 @@ const Callback = () => {
           },
           body: JSON.stringify({ code }),
         });
-        
-        console.log('Response received:', response);
 
         if (!response.ok) {
           const errorData = await response.json();
@@ -66,18 +56,19 @@ const Callback = () => {
         }
 
         const tokenData = await response.json();
-        console.log('✅ Access token received:', tokenData);
+        console.log('✅ Authentication successful!', tokenData);
 
-        // Store the access token (you might want to use a state management solution)
+        // Store tokens and user info
         localStorage.setItem('spotify_access_token', tokenData.access_token);
         localStorage.setItem('spotify_refresh_token', tokenData.refresh_token);
+        localStorage.setItem('spotify_user_id', tokenData.user.spotify_id);
 
-        setStatus('Authentication successful! Redirecting...');
+        setStatus('Success! Fetching your music data...');
         
-        // Redirect back to home page after successful authentication
+        // Redirect to dashboard
         setTimeout(() => {
-          navigate('/');
-        }, 2000);
+          navigate('/dashboard');
+        }, 1500);
 
       } catch (error) {
         console.error('❌ Token exchange failed:', error);
@@ -90,17 +81,85 @@ const Callback = () => {
   }, [location, navigate]);
 
   return (
-    <div style={{ padding: '2rem', textAlign: 'center' }}>
-      <h2>Spotify Authentication</h2>
-      <p>{status}</p>
-      {error && (
-        <div style={{ color: 'red', marginTop: '1rem' }}>
-          <p>Error: {error}</p>
-          <button onClick={() => navigate('/')} style={{ marginTop: '1rem' }}>
-            Return to Home
-          </button>
-        </div>
-      )}
+    <div style={{ 
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(-45deg, #0f3443, #34e89e, #1db954, #0a2f3a, #2dd4aa)',
+      backgroundSize: '400% 400%',
+      animation: 'gradientFlow 15s ease infinite',
+      padding: '2rem'
+    }}>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.95)',
+        padding: '3rem',
+        borderRadius: '12px',
+        textAlign: 'center',
+        maxWidth: '500px',
+        width: '100%',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h2 style={{ marginBottom: '1rem', color: '#333' }}>Spotify Authentication</h2>
+        
+        {!error && (
+          <div style={{ margin: '2rem 0' }}>
+            <div style={{
+              width: '50px',
+              height: '50px',
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #1db954',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto'
+            }}></div>
+          </div>
+        )}
+        
+        <p style={{ color: '#666', fontSize: '1.1rem' }}>{status}</p>
+        
+        {error && (
+          <div style={{ 
+            marginTop: '1.5rem',
+            padding: '1rem',
+            background: '#fee',
+            borderRadius: '8px',
+            border: '1px solid #fcc'
+          }}>
+            <p style={{ color: '#c33', fontWeight: 'bold', margin: '0 0 0.5rem 0' }}>
+              Error
+            </p>
+            <p style={{ color: '#c33', margin: 0 }}>{error}</p>
+            <button 
+              onClick={() => navigate('/')} 
+              style={{
+                marginTop: '1rem',
+                padding: '0.75rem 1.5rem',
+                background: '#1db954',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Return to Home
+            </button>
+          </div>
+        )}
+      </div>
+      
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes gradientFlow {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      `}</style>
     </div>
   );
 };
