@@ -2,6 +2,7 @@ require('dotenv').config({ path: './server/.env' });
 console.log('Starting Concert Companion Server...');
 
 const spotifyService = require('./services/spotifyService');
+const ticketmasterService = require('./services/ticketmasterService');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -298,6 +299,83 @@ app.post('/api/user/refresh-artists', async (req, res) => {
     res.status(500).json({
       error: 'Failed to refresh artists',
       message: error.message
+    });
+  }
+});
+
+app.get('/api/concerts/top-artists/:spotifyId', async (req, res) => {
+  const { spotifyId } = req.params;
+  const eventsPerArtist = Math.min(parseInt(req.query.limit, 10) || 3, 10);
+  const artistLimit = Math.min(parseInt(req.query.artists, 10) || 5, 20);
+  const explicitCountryCode = req.query.countryCode;
+
+  try {
+    const user = await spotifyService.getUserBySpotifyId(spotifyId);
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found',
+      });
+    }
+
+    const artists = await spotifyService.getUserArtistsFromDB(user.id);
+
+    if (!artists.length) {
+      return res.json({
+        generatedAt: new Date().toISOString(),
+        artistCount: 0,
+        results: [],
+      });
+    }
+
+    const selectedArtists = artists.slice(0, artistLimit);
+    const countryCode = explicitCountryCode || (user.country ? user.country.toUpperCase() : undefined);
+
+    const results = await Promise.all(
+      selectedArtists.map(async (artist) => {
+        const artistSummary = {
+          id: artist.id,
+          name: artist.artist_name,
+          spotifyId: artist.artist_spotify_id,
+          rank: artist.rank,
+          imageUrl: artist.artist_image_url,
+        };
+
+        try {
+          const events = await ticketmasterService.getEventsForArtist(artist.artist_name, {
+            size: eventsPerArtist,
+            countryCode,
+          });
+
+          return {
+            artist: artistSummary,
+            events,
+          };
+        } catch (error) {
+          console.error(`Failed to fetch concerts for ${artist.artist_name}:`, error.message);
+          return {
+            artist: artistSummary,
+            events: [],
+            error: error.message,
+          };
+        }
+      })
+    );
+
+    const totalEvents = results.reduce((sum, item) => sum + item.events.length, 0);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      artistCount: selectedArtists.length,
+      totalEvents,
+      countryCode: countryCode || null,
+      results,
+    });
+  } catch (error) {
+    console.error('Error fetching concerts for top artists:', error);
+    res.status(500).json({
+      error: 'Failed to fetch concerts for top artists',
+      message: error.message,
     });
   }
 });

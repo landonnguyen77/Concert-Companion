@@ -68,6 +68,12 @@
   animation: spin 1s linear infinite;
 }
 
+.spinner.small {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -254,6 +260,144 @@
   font-size: 1.1rem;
 }
 
+.concerts-section {
+  margin-bottom: 2.5rem;
+}
+
+.concerts-header {
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.concerts-meta {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+}
+
+.concerts-state {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+  color: #333;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+}
+
+.concerts-state p {
+  margin: 0.5rem 0 0;
+}
+
+.concerts-state.error {
+  color: #b91c1c;
+}
+
+.concerts-state.empty {
+  color: #555;
+}
+
+.concerts-state.artist-empty {
+  background: transparent;
+  box-shadow: none;
+  padding: 0.75rem 0;
+  color: #666;
+}
+
+.concerts-groups {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.concert-group-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.concert-group-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.concert-artist-image {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #1db954;
+}
+
+.concert-group-info h3 {
+  margin: 0;
+  color: #222;
+  font-size: 1.2rem;
+}
+
+.concert-group-info p {
+  margin: 0.25rem 0 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.concert-events-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.concert-event-card {
+  display: flex;
+  gap: 1rem;
+  background: rgba(245, 245, 245, 0.85);
+  border-radius: 10px;
+  padding: 1rem;
+  align-items: center;
+}
+
+.concert-event-image {
+  flex: 0 0 120px;
+  height: 80px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.concert-event-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.concert-event-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.concert-event-details h4 {
+  margin: 0;
+  color: #222;
+  font-size: 1.05rem;
+}
+
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.event-price {
+  margin: 0;
+  font-weight: 600;
+  color: #1db954;
+}
+
 /* Next Steps Section */
 .next-steps {
   margin-top: 3rem;
@@ -328,6 +472,11 @@
   cursor: not-allowed;
 }
 
+.btn-small {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+}
+
 .btn-logout {
   background: rgba(255, 255, 255, 0.2);
   color: white;
@@ -362,5 +511,26 @@
 
   .container {
     padding: 0 1rem;
+  }
+
+  .concerts-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .concert-group-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .concert-event-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .concert-event-image {
+    width: 100%;
+    height: 180px;
   }
 }

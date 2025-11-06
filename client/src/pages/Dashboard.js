@@ -9,6 +9,120 @@ const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [topArtists, setTopArtists] = useState([]);
   const [error, setError] = useState(null);
+  const [concertGroups, setConcertGroups] = useState([]);
+  const [concertsLoading, setConcertsLoading] = useState(false);
+  const [concertsError, setConcertsError] = useState(null);
+  const [concertMeta, setConcertMeta] = useState(null);
+
+  const formatEventDate = (dateString) => {
+    if (!dateString) {
+      return 'Date TBA';
+    }
+
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) {
+      return dateString;
+    }
+
+    return parsed.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  };
+
+  const formatEventLocation = (venue) => {
+    if (!venue) {
+      return 'Location TBA';
+    }
+
+    const parts = [venue.city, venue.state, venue.country].filter(Boolean);
+
+    if (parts.length) {
+      return parts.join(', ');
+    }
+
+    if (venue.address) {
+      return venue.address;
+    }
+
+    return 'Location TBA';
+  };
+
+  const formatPriceRange = (price) => {
+    if (!price || (!price.min && !price.max)) {
+      return 'Price info coming soon';
+    }
+
+    const currencyCode = (price.currency || 'USD').toUpperCase();
+    let formatter;
+
+    try {
+      formatter = new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: currencyCode,
+        minimumFractionDigits: 0
+      });
+    } catch (formatError) {
+      formatter = new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0
+      });
+    }
+
+    const hasMin = typeof price.min === 'number';
+    const hasMax = typeof price.max === 'number';
+
+    if (hasMin && hasMax) {
+      return `${formatter.format(price.min)} – ${formatter.format(price.max)}`;
+    }
+
+    if (hasMin) {
+      return `From ${formatter.format(price.min)}`;
+    }
+
+    return `Up to ${formatter.format(price.max)}`;
+  };
+
+  const fetchConcertsForUser = async (spotifyIdParam) => {
+    if (!spotifyIdParam) {
+      setConcertGroups([]);
+      setConcertMeta(null);
+      return;
+    }
+
+    try {
+      setConcertsLoading(true);
+      setConcertsError(null);
+      setConcertGroups([]);
+
+      const response = await fetch(`http://localhost:5001/api/concerts/top-artists/${spotifyIdParam}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch concerts');
+      }
+
+      const data = await response.json();
+
+      setConcertGroups(data.results || []);
+      setConcertMeta({
+        generatedAt: data.generatedAt,
+        countryCode: data.countryCode,
+        totalEvents: data.totalEvents,
+        artistCount: data.artistCount
+      });
+    } catch (error) {
+      console.error('Error fetching concerts:', error);
+      setConcertsError(error.message);
+      setConcertGroups([]);
+      setConcertMeta(null);
+    } finally {
+      setConcertsLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchUserData();
@@ -21,6 +135,9 @@ const Dashboard = () => {
       
       if (!spotifyId) {
         // Not logged in, redirect to home
+        setConcertGroups([]);
+        setConcertMeta(null);
+        setConcertsLoading(false);
         navigate('/');
         return;
       }
@@ -39,11 +156,23 @@ const Dashboard = () => {
 
       setUser(data.user);
       setTopArtists(data.top_artists);
+      setConcertsError(null);
+
+      if (Array.isArray(data.top_artists) && data.top_artists.length > 0) {
+        fetchConcertsForUser(spotifyId);
+      } else {
+        setConcertGroups([]);
+        setConcertMeta(null);
+      }
+
       setLoading(false);
 
     } catch (error) {
       console.error('Error fetching user data:', error);
       setError(error.message);
+      setConcertsLoading(false);
+      setConcertGroups([]);
+      setConcertMeta(null);
       setLoading(false);
     }
   };
@@ -186,6 +315,98 @@ const Dashboard = () => {
                         <span className="popularity-value">{artist.popularity}</span>
                       </div>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Concerts Section */}
+          <section className="concerts-section">
+            <div className="section-header concerts-header">
+              <h2>Upcoming Concerts</h2>
+              {concertMeta?.countryCode && (
+                <span className="concerts-meta">
+                  Showing events in {concertMeta.countryCode}
+                </span>
+              )}
+            </div>
+
+            {concertsLoading && (
+              <div className="concerts-state">
+                <div className="spinner small"></div>
+                <p>Scanning Ticketmaster for your favorite artists...</p>
+              </div>
+            )}
+
+            {concertsError && !concertsLoading && (
+              <div className="concerts-state error">
+                <p>Could not load concerts: {concertsError}</p>
+              </div>
+            )}
+
+            {!concertsLoading && !concertsError && concertGroups.length === 0 && (
+              <div className="concerts-state empty">
+                <p>No upcoming concerts found for your top artists. Check back soon!</p>
+              </div>
+            )}
+
+            {!concertsLoading && !concertsError && concertGroups.length > 0 && (
+              <div className="concerts-groups">
+                {concertGroups.map((group) => (
+                  <div
+                    key={group.artist.spotifyId || group.artist.id}
+                    className="concert-group-card"
+                  >
+                    <div className="concert-group-header">
+                      {group.artist.imageUrl && (
+                        <img
+                          src={group.artist.imageUrl}
+                          alt={group.artist.name}
+                          className="concert-artist-image"
+                        />
+                      )}
+                      <div className="concert-group-info">
+                        <h3>{group.artist.name}</h3>
+                        {group.artist.rank && (
+                          <p>Top Artist #{group.artist.rank}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {group.events.length === 0 ? (
+                      <div className="concerts-state artist-empty">
+                        <p>No upcoming shows found on Ticketmaster.</p>
+                      </div>
+                    ) : (
+                      <ul className="concert-events-list">
+                        {group.events.map((event) => (
+                          <li key={event.id} className="concert-event-card">
+                            {event.imageUrl && (
+                              <div className="concert-event-image">
+                                <img src={event.imageUrl} alt={event.name} />
+                              </div>
+                            )}
+                            <div className="concert-event-details">
+                              <h4>{event.name}</h4>
+                              <div className="event-meta">
+                                <span>{formatEventDate(event.date)}</span>
+                                <span>{formatEventLocation(event.venue)}</span>
+                              </div>
+                              <p className="event-price">{formatPriceRange(event.price)}</p>
+                              <a
+                                href={event.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-primary btn-small"
+                              >
+                                View Tickets
+                              </a>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 ))}
               </div>

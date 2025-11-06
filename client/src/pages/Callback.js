@@ -1,4 +1,3 @@
-// client/src/pages/Callback.js - REPLACE YOUR EXISTING FILE
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 

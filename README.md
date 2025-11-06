@@ -17,3 +17,9 @@ A full-stack web application that connects to users' Spotify accounts to provide
 - **Database**: PostgreSQL
 - **Authentication**: JWT with Spotify OAuth
 - **APIs**: Spotify Web API, Ticketmaster Discovery API, Google Places API
+
+## Environment Variables
+
+Configure these in `server/.env` (or your deployment environment) before starting the backend:
+
+- `TICKETMASTER_API_KEY` &mdash; Ticketmaster Discovery API key used to look up concerts for the user's top artists.
